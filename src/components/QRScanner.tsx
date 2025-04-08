@@ -1,9 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useCredentialReceiver } from '@/hooks/useCredentialReceiver';
-// 實際專案中需要引入 QR 掃描庫，這裡為示例
 
 export const QRScanner = ({ did }: { did: string | null }) => {
   const [qrValue, setQrValue] = useState<string>('');
@@ -11,16 +10,15 @@ export const QRScanner = ({ did }: { did: string | null }) => {
   const { state, processCredentialOffer } = useCredentialReceiver(did);
   
   // 手動輸入 URI
-  const handleManualInput = async () => {
+  const handleManualInput = () => {
     if (!qrValue) return;
-    await processCredentialOffer(qrValue);
+    processCredentialOffer(qrValue);
   };
   
   // 開始掃描 QR 碼
   const startScanning = () => {
     setScanning(true);
-    // 在實際實現中，我們會初始化 QR 掃描器
-    // 例如使用 html5-qrcode 或其他掃描庫
+    // 在實際實現中，初始化 QR 掃描器
     // 這裡僅作示範
   };
   
@@ -28,14 +26,14 @@ export const QRScanner = ({ did }: { did: string | null }) => {
     setScanning(false);
   };
   
-  // 模擬掃描結果處理函數
-  const handleScanResult = (result: string) => {
-    if (result) {
-      setQrValue(result);
-      processCredentialOffer(result);
-      stopScanning();
-    }
-  };
+  // 模擬掃描結果處理函數 - 實際環境下應由掃描庫觸發
+  //const handleScanResult = (result: string) => {
+  //  if (result) {
+  //    setQrValue(result);
+  //    processCredentialOffer(result);
+  //    stopScanning();
+  //  }
+  //};
   
   return (
     <div className="p-4 max-w-md mx-auto">
@@ -87,6 +85,7 @@ export const QRScanner = ({ did }: { did: string | null }) => {
           <Button 
             onClick={handleManualInput} 
             disabled={!qrValue || state.isLoading}
+            type="button"
           >
             {state.isLoading ? '處理中...' : '領取'}
           </Button>
