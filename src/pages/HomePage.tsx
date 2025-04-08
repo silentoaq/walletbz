@@ -98,7 +98,7 @@ export const HomePage = () => {
                   <p className="text-xs text-gray-500 mb-2">
                     發行者: {latestCredential.issuer}
                   </p>
-                  
+                  {/* 
                   {Object.keys(latestCredential.disclosedClaims).length > 0 && (
                     <div className="mt-2 space-y-1">
                       <p className="text-xs font-medium">已揭露欄位:</p>
@@ -116,6 +116,7 @@ export const HomePage = () => {
                       </div>
                     </div>
                   )}
+                  */}
                 </div>
                 
                 <Link 

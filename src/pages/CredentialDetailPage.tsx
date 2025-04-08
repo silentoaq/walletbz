@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { decodeSDJWT, parseDisclosures } from '@/utils/sd-jwt';
+import { decodeSDJWT, parseDisclosures, DisclosureField } from '@/utils/sd-jwt';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChevronLeft, Eye, Share2, Trash2 } from 'lucide-react';
+import { ChevronLeft, Eye, Share2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -23,9 +23,10 @@ export const CredentialDetailPage = () => {
   const navigate = useNavigate();
   const [credentials, setCredentials] = useLocalStorage<string[]>('walletCredentials', []);
   const [credential, setCredential] = useState<any>(null);
-  const [disclosures, setDisclosures] = useState<Array<{ key: string; value: any }>>([]);
+  const [disclosures, setDisclosures] = useState<DisclosureField[]>([]);
   const [selectedDisclosures, setSelectedDisclosures] = useState<string[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [expandedFields, setExpandedFields] = useState<string[]>([]);
   
   useEffect(() => {
     if (!encodedJwt) {
@@ -43,12 +44,12 @@ export const CredentialDetailPage = () => {
       
       setCredential(decoded);
       
-      // 解析所有可揭露欄位
+      // 解析所有欄位
       const fields = parseDisclosures(decodedJwt);
-      setDisclosures(fields.map(f => ({ key: f.key, value: f.value })));
+      setDisclosures(fields);
       
-      // 初始化已選欄位為已揭露的欄位
-      setSelectedDisclosures(Object.keys(decoded.disclosedClaims));
+      // 初始化選中欄位
+      setSelectedDisclosures(fields.map(f => f.key));
     } catch (e) {
       console.error('載入憑證詳情失敗:', e);
       navigate('/credentials');
@@ -58,6 +59,15 @@ export const CredentialDetailPage = () => {
   // 切換欄位選擇
   const toggleField = (key: string) => {
     setSelectedDisclosures(prev => 
+      prev.includes(key) 
+        ? prev.filter(k => k !== key)
+        : [...prev, key]
+    );
+  };
+  
+  // 展開/收合欄位詳情
+  const toggleExpand = (key: string) => {
+    setExpandedFields(prev => 
       prev.includes(key) 
         ? prev.filter(k => k !== key)
         : [...prev, key]
@@ -103,7 +113,7 @@ export const CredentialDetailPage = () => {
             {credential.id.split('/').pop() || '憑證'}
           </CardTitle>
           
-          {/* 顯示憑證類別 (新增) */}
+          {/* 顯示憑證類別 */}
           <div className="flex flex-wrap gap-1 mt-2 mb-2">
             {credential.types && credential.types.map((type: string, i: number) => (
               <Badge key={i} variant={type === 'VerifiableCredential' ? 'outline' : 'secondary'}>
@@ -135,34 +145,66 @@ export const CredentialDetailPage = () => {
         </CardContent>
       </Card>
       
-      <h2 className="text-lg font-semibold mb-3">憑證欄位</h2>
+      <h2 className="text-lg font-semibold mb-3">選擇性揭露欄位</h2>
       <p className="text-sm text-gray-500 mb-4">
-        選擇要揭露的欄位，用於出示憑證時
+        勾選要對驗證方揭露的欄位，點擊欄位可查看更多技術細節
       </p>
       
       <Card className="mb-6">
         <CardContent className="pt-4">
           {disclosures.length > 0 ? (
             <div className="space-y-2">
-              {disclosures.map((field, index) => (
-                <div key={index} className="flex items-center space-x-2 py-2 border-b last:border-b-0">
-                  <Checkbox 
-                    id={`field-${index}`}
-                    checked={selectedDisclosures.includes(field.key)}
-                    onCheckedChange={() => toggleField(field.key)}
-                  />
-                  <div className="flex-1">
-                    <Label htmlFor={`field-${index}`} className="flex justify-between text-sm">
-                      <span className="font-medium">{field.key}</span>
-                      <span className="text-gray-600 truncate max-w-[150px]">
-                        {typeof field.value === 'object' 
-                          ? JSON.stringify(field.value) 
-                          : String(field.value)}
-                      </span>
-                    </Label>
+              {disclosures.map((field, index) => {
+                const isExpanded = expandedFields.includes(field.key);
+                
+                return (
+                  <div key={index} className="border rounded-md">
+                    <div className="flex items-start p-3">
+                      {/* 選擇框 */}
+                      <Checkbox 
+                        id={`field-${index}`}
+                        checked={selectedDisclosures.includes(field.key)}
+                        onCheckedChange={() => toggleField(field.key)}
+                        className="mt-1 mr-2"
+                      />
+                      
+                      {/* 欄位資訊 */}
+                      <div className="flex-1">
+                        <div 
+                          className="flex justify-between items-center cursor-pointer"
+                          onClick={() => toggleExpand(field.key)}
+                        >
+                          <Label htmlFor={`field-${index}`} className="text-sm font-medium cursor-pointer">
+                            {field.key}
+                          </Label>
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </Button>
+                        </div>
+                        
+                        <div className="text-gray-600 text-sm mt-1">
+                          <span className="font-medium">value: </span>
+                          <span className="break-all">
+                            {typeof field.value === 'object' 
+                              ? JSON.stringify(field.value) 
+                              : String(field.value)}
+                          </span>
+                        </div>
+                        
+                        {/* 展開的技術詳情 */}
+                        {isExpanded && (
+                          <div className="mt-2 p-2 bg-gray-50 rounded text-xs space-y-2">
+                            <div>
+                              <span className="font-medium">salt: </span>
+                              <span className="break-all font-mono">{field.salt}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-gray-500 p-4 text-center">
@@ -197,24 +239,28 @@ export const CredentialDetailPage = () => {
               <DialogHeader>
                 <DialogTitle>憑證出示</DialogTitle>
                 <DialogDescription>
-                  該功能允許您將選定欄位的憑證分享給驗證方
+                  將會將選定欄位提供給驗證方
                 </DialogDescription>
               </DialogHeader>
               
               <div className="py-4">
-                <h3 className="text-sm font-medium mb-2">將會揭露的欄位</h3>
+                <h3 className="text-sm font-medium mb-2">以下欄位將被揭露</h3>
                 <div className="border rounded p-3 space-y-2 max-h-[200px] overflow-y-auto">
                   {selectedDisclosures.length > 0 ? (
                     selectedDisclosures.map((key, index) => {
                       const field = disclosures.find(d => d.key === key);
                       return (
-                        <div key={index} className="text-sm flex justify-between">
-                          <span className="font-medium">{key}</span>
-                          <span className="text-gray-600">
-                            {field ? (typeof field.value === 'object' 
-                              ? JSON.stringify(field.value) 
-                              : String(field.value)) : '未知值'}
-                          </span>
+                        <div key={index} className="text-sm">
+                          <div className="font-medium">{key}</div>
+                          {field && (
+                            <div className="text-gray-600 text-xs mt-1">
+                              <span>
+                                {typeof field.value === 'object' 
+                                  ? JSON.stringify(field.value) 
+                                  : String(field.value)}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       );
                     })

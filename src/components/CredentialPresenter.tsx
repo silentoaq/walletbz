@@ -5,7 +5,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { parseJwt, parseDisclosures, rebuildSDJWT } from "@/utils/sd-jwt";
+import { parseJwt, parseDisclosures, DisclosureField, rebuildSDJWT } from "@/utils/sd-jwt";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
 
 // VP 請求介面
 interface VPRequest {
@@ -21,10 +22,10 @@ interface VPRequest {
  */
 export const CredentialPresenter = ({ vpRequestUri }: { vpRequestUri: string }) => {
   const [vpRequest, setVpRequest] = useState<VPRequest | null>(null);
-  const [credentials, setCredentials] = useState<string[]>([]);
+  const [credentials] = useLocalStorage<string[]>('walletCredentials', []);
   const [selectedCredential, setSelectedCredential] = useState<string | null>(null);
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
-  const [disclosureFields, setDisclosureFields] = useState<Array<{key: string, value: any}>>([]);
+  const [disclosureFields, setDisclosureFields] = useState<DisclosureField[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -45,17 +46,6 @@ export const CredentialPresenter = ({ vpRequestUri }: { vpRequestUri: string }) 
       } catch (e) {
         setError('無法讀取出示請求');
         console.error('無法取得 VP 請求:', e);
-      }
-    };
-    
-    // 從 localStorage 載入憑證
-    const loadCredentials = () => {
-      try {
-        const storedCredentials = JSON.parse(localStorage.getItem('walletCredentials') || '[]');
-        setCredentials(storedCredentials);
-      } catch (e) {
-        console.error('載入憑證失敗:', e);
-        setError('無法載入憑證');
       } finally {
         setLoading(false);
       }
@@ -63,16 +53,18 @@ export const CredentialPresenter = ({ vpRequestUri }: { vpRequestUri: string }) 
     
     if (vpRequestUri) {
       fetchVpRequest();
+    } else {
+      setLoading(false);
     }
-    loadCredentials();
   }, [vpRequestUri]);
   
-  // 當憑證被選取時，解析其揭露欄位
+  // 當憑證被選取時，解析其欄位
   useEffect(() => {
     if (selectedCredential) {
       const fields = parseDisclosures(selectedCredential);
-      setDisclosureFields(fields.map(f => ({ key: f.key, value: f.value })));
-      setSelectedFields([]);
+      setDisclosureFields(fields);
+      // 默認選中所有欄位
+      setSelectedFields(fields.map(field => field.key));
     } else {
       setDisclosureFields([]);
       setSelectedFields([]);
@@ -231,25 +223,26 @@ export const CredentialPresenter = ({ vpRequestUri }: { vpRequestUri: string }) 
       
       {selectedCredential && disclosureFields.length > 0 && (
         <div className="mb-6">
-          <h3 className="text-md font-semibold mb-2">選擇要揭露的欄位</h3>
+          <h3 className="text-md font-semibold mb-2">選擇要揭露給驗證方的欄位</h3>
           <div className="space-y-2 border rounded p-3">
             {disclosureFields.map((field, index) => (
-              <div key={index} className="flex items-center space-x-2">
+              <div key={index} className="flex items-start space-x-2 py-2 border-b last:border-b-0">
                 <Checkbox
                   id={`field-${index}`}
                   checked={selectedFields.includes(field.key)}
                   onCheckedChange={() => toggleField(field.key)}
+                  className="mt-1"
                 />
-                <Label htmlFor={`field-${index}`} className="text-sm flex-1">
-                  <div className="flex justify-between">
-                    <span>{field.key}:</span>
-                    <span className="text-gray-600 truncate">
+                <div className="flex-1">
+                  <Label htmlFor={`field-${index}`} className="text-sm">
+                    <div className="font-medium mb-1">{field.key}</div>
+                    <div className="text-gray-600 text-xs">
                       {typeof field.value === 'object' 
                         ? JSON.stringify(field.value) 
                         : String(field.value)}
-                    </span>
-                  </div>
-                </Label>
+                    </div>
+                  </Label>
+                </div>
               </div>
             ))}
           </div>
@@ -262,7 +255,7 @@ export const CredentialPresenter = ({ vpRequestUri }: { vpRequestUri: string }) 
         </Button>
         <Button 
           onClick={submitPresentation} 
-          disabled={!selectedCredential || submitting}
+          disabled={!selectedCredential || submitting || selectedFields.length === 0}
         >
           {submitting ? '提交中...' : '提交憑證'}
         </Button>
