@@ -8,12 +8,34 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { parseJwt, parseDisclosures, DisclosureField, rebuildSDJWT } from "@/utils/sd-jwt";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 
-// VP 請求介面
-interface VPRequest {
-  challenge: string;
-  domain: string;
-  callbackUrl: string;
-  credentialTypes?: string[];
+// OID4VP 請求介面
+interface OID4VPRequest {
+  // 演示定義描述了所需的憑證類型和限制
+  presentation_definition: {
+    id: string;
+    input_descriptors: Array<{
+      id: string;
+      name: string;
+      purpose?: string;
+      constraints?: {
+        fields: Array<{
+          path: string[];
+          filter?: {
+            type: string;
+            pattern: string;
+          };
+        }>;
+      };
+    }>;
+  };
+  // OID4VP 規範的必要欄位
+  response_type: string;
+  response_mode?: string;
+  client_id: string;
+  nonce: string;
+  state: string;
+  redirect_uri?: string;
+  response_uri: string; // 用於提交 VP 的端點
 }
 
 /**
@@ -21,7 +43,7 @@ interface VPRequest {
  * 處理 OID4VP 流程及選擇性揭露
  */
 export const CredentialPresenter = ({ vpRequestUri }: { vpRequestUri: string }) => {
-  const [vpRequest, setVpRequest] = useState<VPRequest | null>(null);
+  const [vpRequest, setVpRequest] = useState<OID4VPRequest | null>(null);
   const [credentials] = useLocalStorage<string[]>('walletCredentials', []);
   const [selectedCredential, setSelectedCredential] = useState<string | null>(null);
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
@@ -43,6 +65,7 @@ export const CredentialPresenter = ({ vpRequestUri }: { vpRequestUri: string }) 
         
         const data = await response.json();
         setVpRequest(data);
+        console.log("收到OID4VP請求:", data);
       } catch (e) {
         setError('無法讀取出示請求');
         console.error('無法取得 VP 請求:', e);
@@ -80,7 +103,7 @@ export const CredentialPresenter = ({ vpRequestUri }: { vpRequestUri: string }) 
     );
   };
   
-  // 提交 VP
+  // 提交 VP (OID4VP 格式)
   const submitPresentation = async () => {
     if (!vpRequest || !selectedCredential) {
       setError('請選擇憑證');
@@ -100,28 +123,45 @@ export const CredentialPresenter = ({ vpRequestUri }: { vpRequestUri: string }) 
       
       console.log(`準備提交憑證，揭露 ${selectedFields.length} 個欄位`);
       
-      // 提交到回調 URL
-      const response = await fetch(vpRequest.callbackUrl, {
+      // 構建符合 OID4VP 規範的請求主體
+      const requestBody = {
+        // VP Token 是核心的憑證數據
+        vp_token: presentationJwt,
+        // 將請求中的 state 原樣返回，用於防止跨站請求
+        state: vpRequest.state,
+        // 描述提交的 VP 數據格式和結構
+        presentation_submission: {
+          id: `presentation-${Date.now()}`,
+          definition_id: vpRequest.presentation_definition.id,
+          descriptor_map: [{
+            id: credentialId,
+            format: 'vc+sd-jwt',
+            path: '$'
+          }]
+        }
+      };
+      
+      console.log("發送VP回應:", requestBody);
+      console.log("回應端點:", vpRequest.response_uri);
+      
+      // 提交到 OID4VP 的 response_uri 端點
+      const response = await fetch(vpRequest.response_uri, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          vp: presentationJwt,
-          presentation_submission: {
-            id: `presentation-${Date.now()}`,
-            definition_id: 'credential-presentation',
-            descriptor_map: [{
-              id: credentialId,
-              format: 'vc+sd-jwt',
-              path: '$',
-            }]
-          }
-        }),
+        body: JSON.stringify(requestBody),
       });
       
       if (!response.ok) {
-        throw new Error(`提交失敗: ${response.status} ${response.statusText}`);
+        try {
+          const errorData = await response.json();
+          console.error("提交失敗:", errorData);
+          throw new Error(`提交失敗: ${errorData.error || response.statusText}`);
+        } catch (parseError) {
+          console.error("提交失敗:", await response.text());
+          throw new Error(`提交失敗: ${response.status} ${response.statusText}`);
+        }
       }
       
       setSuccess(true);
@@ -165,6 +205,19 @@ export const CredentialPresenter = ({ vpRequestUri }: { vpRequestUri: string }) 
     );
   }
   
+  // 獲取請求來源網域
+  const getDomain = () => {
+    if (!vpRequest) return '';
+    return vpRequest.client_id.split(':').pop() || vpRequest.client_id;
+  };
+  
+  // 獲取憑證類型要求
+  const getCredentialTypes = () => {
+    if (!vpRequest || !vpRequest.presentation_definition.input_descriptors) return [];
+    // 從 input_descriptors 中提取需要的憑證類型
+    return vpRequest.presentation_definition.input_descriptors.map(d => d.name);
+  };
+  
   return (
     <div className="p-4 max-w-md mx-auto">
       <h2 className="text-xl font-bold mb-4">憑證出示請求</h2>
@@ -176,11 +229,17 @@ export const CredentialPresenter = ({ vpRequestUri }: { vpRequestUri: string }) 
           </CardHeader>
           <CardContent>
             <div className="text-sm space-y-2">
-              <div><span className="font-medium">來源網域:</span> {vpRequest.domain}</div>
-              {vpRequest.credentialTypes && (
+              <div><span className="font-medium">來源網域:</span> {getDomain()}</div>
+              
+              <div>
+                <span className="font-medium">請求類型:</span> 
+                <span className="ml-1 text-blue-600">OID4VP</span>
+              </div>
+              
+              {getCredentialTypes().length > 0 && (
                 <div>
                   <span className="font-medium">憑證類型:</span> 
-                  {vpRequest.credentialTypes.join(', ')}
+                  <span className="ml-1">{getCredentialTypes().join(', ')}</span>
                 </div>
               )}
             </div>

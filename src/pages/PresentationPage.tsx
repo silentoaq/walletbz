@@ -45,9 +45,9 @@ export const PresentationPage = () => {
         if (!response.ok) throw new Error('無法獲取VP請求');
         
         const vpRequest = await response.json();
-        const callbackUrl = vpRequest.callbackUrl;
+        const responseUri = vpRequest.response_uri;
         
-        if (!callbackUrl) throw new Error('無效的VP請求');
+        if (!responseUri) throw new Error('無效的VP請求 - 缺少response_uri');
         
         // 使用選定欄位重建SD-JWT
         const presentationJwt = rebuildSDJWT(
@@ -55,15 +55,16 @@ export const PresentationPage = () => {
           credentialData.selectedDisclosures
         );
         
-        // 提交憑證
-        const submitResponse = await fetch(callbackUrl, {
+        // 提交憑證 - 使用 OID4VP 格式
+        const submitResponse = await fetch(responseUri, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             vp_token: presentationJwt,
+            state: vpRequest.state,
             presentation_submission: {
               id: `presentation-${Date.now()}`,
-              definition_id: 'credential-presentation',
+              definition_id: vpRequest.presentation_definition.id,
               descriptor_map: [{
                 id: 'credential',
                 format: 'vc+sd-jwt',
@@ -121,7 +122,7 @@ export const PresentationPage = () => {
                     <Input 
                       value={vpRequestUri}
                       onChange={(e) => setVpRequestUri(e.target.value)}
-                      placeholder="https://example.com/vp-request/123"
+                      placeholder="https://example.com/oid4vp/request/123"
                       className="flex-1"
                       required
                     />
