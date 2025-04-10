@@ -107,7 +107,7 @@ export const CredentialPresenter = ({ vpRequestUri }: { vpRequestUri: string }) 
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          vp_token: presentationJwt,
+          vp: presentationJwt,
           presentation_submission: {
             id: `presentation-${Date.now()}`,
             definition_id: 'credential-presentation',
