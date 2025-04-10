@@ -1,24 +1,31 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ChevronLeft } from 'lucide-react';
 import { CredentialPresenter } from '@/components/CredentialPresenter';
-import { ChevronLeft, ScanLine } from 'lucide-react';
+import { QRScanner } from '@/components/QRScanner';
 import { rebuildSDJWT } from '@/utils/sd-jwt';
+import { useLocalStorage } from '@/hooks/useLocalStorage';
+import { usePhantomWallet } from '@/hooks/usePhantomWallet';
 
 export const PresentationPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { wallet } = usePhantomWallet();
   const [vpRequestUri, setVpRequestUri] = useState<string>('');
   const [credentialData, setCredentialData] = useState<{
     jwt: string;
     selectedDisclosures: string[];
   } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const [credentials] = useLocalStorage<string[]>('walletCredentials', []);
+  const hasCredentials = credentials.length > 0;
   
-  // 從URL參數或location state獲取資料
   useEffect(() => {
-    // 1. 檢查是否有來自詳情頁的憑證資料
     if (location.state && location.state.jwt) {
       setCredentialData({
         jwt: location.state.jwt,
@@ -26,7 +33,6 @@ export const PresentationPage = () => {
       });
     }
     
-    // 2. 從URL params獲取VP請求URI
     const params = new URLSearchParams(location.search);
     const uri = params.get('request_uri');
     if (uri) {
@@ -34,12 +40,21 @@ export const PresentationPage = () => {
     }
   }, [location]);
   
+  // 處理從掃描器收到的URI
+  const handleScanResult = (uri: string) => {
+    setVpRequestUri(uri);
+    navigate(`/present?request_uri=${encodeURIComponent(uri)}`, { replace: true });
+  };
+
   // 如果同時有憑證資料和VP請求URI，生成並提交VP
   useEffect(() => {
     const presentCredential = async () => {
       if (!credentialData || !vpRequestUri) return;
       
       try {
+        setLoading(true);
+        setError(null);
+        
         // 獲取VP請求內容
         const response = await fetch(vpRequestUri);
         if (!response.ok) throw new Error('無法獲取VP請求');
@@ -55,7 +70,7 @@ export const PresentationPage = () => {
           credentialData.selectedDisclosures
         );
         
-        // 提交憑證 - 使用 OID4VP 格式
+        // 提交憑證 
         const submitResponse = await fetch(responseUri, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -74,25 +89,84 @@ export const PresentationPage = () => {
           })
         });
         
-        if (!submitResponse.ok) throw new Error('提交憑證失敗');
+        if (!submitResponse.ok) {
+          const errorText = await submitResponse.text();
+          throw new Error(`提交憑證失敗: ${submitResponse.status} ${errorText.substring(0, 100)}`);
+        }
         
-        // 提示成功
-        alert('憑證出示成功！');
-        navigate('/credentials');
-        
+        setSuccess(true);
       } catch (error) {
-        console.error('出示憑證過程中發生錯誤:', error);
-        alert('出示憑證失敗，請稍後再試。');
+        //console.error('出示憑證過程中發生錯誤:', error);
+        setError(error instanceof Error ? error.message : '提交憑證時發生未知錯誤');
+      } finally {
+        setLoading(false);
       }
     };
     
     presentCredential();
   }, [credentialData, vpRequestUri, navigate]);
   
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    // 重定向到同一頁面，但帶上request_uri參數
-    navigate(`/present?request_uri=${encodeURIComponent(vpRequestUri)}`);
+
+  const renderContent = () => {
+    if (!hasCredentials) {
+      return (
+        <div className="text-center p-6 bg-gray-50 rounded-lg border border-dashed">
+          <p className="text-gray-500 mb-3">您目前沒有可出示的憑證</p>
+          <Button variant="outline" onClick={() => navigate('/scan')}>
+            前往領取憑證
+          </Button>
+        </div>
+      );
+    }
+    
+    // 如果有錯誤
+    if (error) {
+      return (
+        <Alert variant="destructive" className="mb-4">
+          <AlertDescription>{error}</AlertDescription>
+          <Button onClick={() => setError(null)} variant="outline" size="sm" className="mt-2">
+            重試
+          </Button>
+        </Alert>
+      );
+    }
+    
+    // 如果成功
+    if (success) {
+      return (
+        <Alert className="mb-4 bg-green-50 border-green-300 text-green-800">
+          <AlertDescription>憑證已成功提交！</AlertDescription>
+          <div className="mt-4 flex justify-center">
+            <Button onClick={() => navigate('/home')}>返回首頁</Button>
+          </div>
+        </Alert>
+      );
+    }
+    
+    // 如果正在加載
+    if (loading) {
+      return (
+        <div className="text-center p-6">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p>正在處理您的憑證出示請求...</p>
+        </div>
+      );
+    }
+    
+    // 如果有VP請求URI
+    if (vpRequestUri) {
+      return <CredentialPresenter vpRequestUri={vpRequestUri} />;
+    }
+    
+    return (
+      <div className="p-2">
+        <QRScanner 
+          did={wallet.did} 
+          mode="present" 
+          onSubmit={handleScanResult} 
+        />
+      </div>
+    );
   };
   
   return (
@@ -109,55 +183,16 @@ export const PresentationPage = () => {
         <h1 className="text-xl font-bold">出示憑證</h1>
       </div>
       
-      {!vpRequestUri ? (
-        <div className="space-y-6">
-          <Card>
-            <CardContent className="pt-6">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium mb-1 block">
-                    輸入VP請求連結
-                  </label>
-                  <div className="flex space-x-2">
-                    <Input 
-                      value={vpRequestUri}
-                      onChange={(e) => setVpRequestUri(e.target.value)}
-                      placeholder="https://example.com/oid4vp/request/123"
-                      className="flex-1"
-                      required
-                    />
-                    <Button type="submit">處理</Button>
-                  </div>
-                </div>
-              </form>
-              
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-gray-300" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-white px-2 text-gray-500">或者</span>
-                </div>
-              </div>
-              
-              <Button 
-                variant="outline" 
-                className="w-full py-8 flex flex-col items-center justify-center"
-                onClick={() => alert('掃描功能即將推出')}
-              >
-                <ScanLine className="h-10 w-10 mb-2 text-gray-400" />
-                <span>掃描驗證方的 QR 碼</span>
-              </Button>
-            </CardContent>
-          </Card>
-          
-          <div className="text-sm text-gray-500 text-center mt-4">
-            掃描或輸入驗證方提供的請求連結，出示您的憑證
-          </div>
-        </div>
-      ) : (
-        <CredentialPresenter vpRequestUri={vpRequestUri} />
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle>
+            {vpRequestUri ? '驗證方請求' : '掃描憑證出示碼'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {renderContent()}
+        </CardContent>
+      </Card>
     </div>
   );
 };

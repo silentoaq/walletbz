@@ -8,9 +8,7 @@ export const LoginPage = () => {
   const { wallet, connect } = usePhantomWallet();
   const navigate = useNavigate();
   
-  // 若已連接錢包，導向首頁
   useEffect(() => {
-    // 添加一個條件，只有在路徑是 /login 或 / 時才導航到 /home
     const currentPath = window.location.pathname;
     if (wallet.connected && (currentPath === "/login" || currentPath === "/")) {
       navigate('/home');

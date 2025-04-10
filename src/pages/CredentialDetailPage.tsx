@@ -113,7 +113,6 @@ export const CredentialDetailPage = () => {
             {credential.id.split('/').pop() || '憑證'}
           </CardTitle>
           
-          {/* 顯示憑證類別 */}
           <div className="flex flex-wrap gap-1 mt-2 mb-2">
             {credential.types && credential.types.map((type: string, i: number) => (
               <Badge key={i} variant={type === 'VerifiableCredential' ? 'outline' : 'secondary'}>

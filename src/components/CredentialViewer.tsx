@@ -19,7 +19,7 @@ export const CredentialViewer = () => {
         
         setDecodedCredentials(decoded);
       } catch (e) {
-        console.error('載入憑證失敗:', e);
+        //console.error('載入憑證失敗:', e);
       } finally {
         setLoading(false);
       }

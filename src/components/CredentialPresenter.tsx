@@ -65,10 +65,10 @@ export const CredentialPresenter = ({ vpRequestUri }: { vpRequestUri: string }) 
         
         const data = await response.json();
         setVpRequest(data);
-        console.log("收到OID4VP請求:", data);
+        //console.log("收到OID4VP請求:", data);
       } catch (e) {
         setError('無法讀取出示請求');
-        console.error('無法取得 VP 請求:', e);
+        //console.error('無法取得 VP 請求:', e);
       } finally {
         setLoading(false);
       }
@@ -121,7 +121,7 @@ export const CredentialPresenter = ({ vpRequestUri }: { vpRequestUri: string }) 
       const payload = parseJwt(jwt);
       const credentialId = payload?.vc?.id || 'credential';
       
-      console.log(`準備提交憑證，揭露 ${selectedFields.length} 個欄位`);
+      //console.log(`準備提交憑證，揭露 ${selectedFields.length} 個欄位`);
       
       // 構建符合 OID4VP 規範的請求主體
       const requestBody = {
@@ -141,8 +141,8 @@ export const CredentialPresenter = ({ vpRequestUri }: { vpRequestUri: string }) 
         }
       };
       
-      console.log("發送VP回應:", requestBody);
-      console.log("回應端點:", vpRequest.response_uri);
+      //console.log("發送VP回應:", requestBody);
+      //console.log("回應端點:", vpRequest.response_uri);
       
       // 提交到 OID4VP 的 response_uri 端點
       const response = await fetch(vpRequest.response_uri, {
@@ -154,19 +154,13 @@ export const CredentialPresenter = ({ vpRequestUri }: { vpRequestUri: string }) 
       });
       
       if (!response.ok) {
-        try {
-          const errorData = await response.json();
-          console.error("提交失敗:", errorData);
-          throw new Error(`提交失敗: ${errorData.error || response.statusText}`);
-        } catch (parseError) {
-          console.error("提交失敗:", await response.text());
-          throw new Error(`提交失敗: ${response.status} ${response.statusText}`);
-        }
+        //console.error("提交失敗:", await response.text());
+        throw new Error(`提交失敗: ${response.status} ${response.statusText}`);
       }
       
       setSuccess(true);
     } catch (e) {
-      console.error('提交憑證失敗:', e);
+      //console.error('提交憑證失敗:', e);
       setError(e instanceof Error ? e.message : '提交憑證時發生未知錯誤');
     } finally {
       setSubmitting(false);
