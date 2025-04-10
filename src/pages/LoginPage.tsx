@@ -81,7 +81,7 @@ export const LoginPage = () => {
       </main>
       
       <footer className="text-center text-xs text-gray-500 py-4">
-        &copy; {new Date().getFullYear()} walletbz - 去中心化身份憑證錢包
+        &copy; {new Date().getFullYear()} walletbz
       </footer>
     </div>
   );
