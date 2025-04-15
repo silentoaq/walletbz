@@ -43,7 +43,7 @@ export const QRScanner: React.FC<QRScannerProps> = ({
   // 掃描區塊的標籤文本
   const scanText = mode === 'receive' 
     ? '掃描憑證領取碼' 
-    : '掃描驗證方QR碼';
+    : '掃描憑證出示碼';
   
   // 輸入框的佔位符文本
   const placeholder = mode === 'receive' 
