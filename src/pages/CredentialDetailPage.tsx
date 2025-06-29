@@ -27,53 +27,57 @@ export const CredentialDetailPage = () => {
   const [selectedDisclosures, setSelectedDisclosures] = useState<string[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [expandedFields, setExpandedFields] = useState<string[]>([]);
-  
+
   useEffect(() => {
     if (!encodedJwt) {
       navigate('/credentials');
       return;
     }
-    
-    try {
-      const decodedJwt = decodeURIComponent(encodedJwt);
-      const decoded = decodeSDJWT(decodedJwt);
-      
-      if (!decoded) {
-        throw new Error('無法解析憑證');
+
+    const loadCredential = async () => {
+      try {
+        const decodedJwt = decodeURIComponent(encodedJwt);
+        const decoded = await decodeSDJWT(decodedJwt);
+
+        if (!decoded) {
+          throw new Error('無法解析憑證');
+        }
+
+        setCredential(decoded);
+
+        // 解析所有欄位
+        const fields = parseDisclosures(decodedJwt);
+        setDisclosures(fields);
+
+        // 初始化選中欄位
+        setSelectedDisclosures(fields.map(f => f.key));
+      } catch (e) {
+        console.error('載入憑證詳情失敗:', e);
+        navigate('/credentials');
       }
-      
-      setCredential(decoded);
-      
-      // 解析所有欄位
-      const fields = parseDisclosures(decodedJwt);
-      setDisclosures(fields);
-      
-      // 初始化選中欄位
-      setSelectedDisclosures(fields.map(f => f.key));
-    } catch (e) {
-      console.error('載入憑證詳情失敗:', e);
-      navigate('/credentials');
-    }
+    };
+
+    loadCredential();
   }, [encodedJwt, navigate]);
-  
+
   // 切換欄位選擇
   const toggleField = (key: string) => {
-    setSelectedDisclosures(prev => 
-      prev.includes(key) 
+    setSelectedDisclosures(prev =>
+      prev.includes(key)
         ? prev.filter(k => k !== key)
         : [...prev, key]
     );
   };
-  
+
   // 展開/收合欄位詳情
   const toggleExpand = (key: string) => {
-    setExpandedFields(prev => 
-      prev.includes(key) 
+    setExpandedFields(prev =>
+      prev.includes(key)
         ? prev.filter(k => k !== key)
         : [...prev, key]
     );
   };
-  
+
   // 刪除憑證
   const deleteCredential = () => {
     try {
@@ -84,7 +88,7 @@ export const CredentialDetailPage = () => {
       console.error('刪除憑證失敗:', e);
     }
   };
-  
+
   if (!credential) {
     return (
       <div className="flex justify-center items-center p-10">
@@ -92,13 +96,13 @@ export const CredentialDetailPage = () => {
       </div>
     );
   }
-  
+
   return (
     <div>
       <div className="flex items-center mb-6">
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => navigate('/credentials')}
           className="mr-2"
         >
@@ -106,13 +110,13 @@ export const CredentialDetailPage = () => {
         </Button>
         <h1 className="text-xl font-bold">憑證詳情</h1>
       </div>
-      
+
       <Card className="mb-6">
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">
             {credential.id.split('/').pop() || '憑證'}
           </CardTitle>
-          
+
           <div className="flex flex-wrap gap-1 mt-2 mb-2">
             {credential.types && credential.types.map((type: string, i: number) => (
               <Badge key={i} variant={type === 'VerifiableCredential' ? 'outline' : 'secondary'}>
@@ -121,7 +125,7 @@ export const CredentialDetailPage = () => {
             ))}
           </div>
         </CardHeader>
-        
+
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <div className="text-sm">
@@ -143,33 +147,33 @@ export const CredentialDetailPage = () => {
           </div>
         </CardContent>
       </Card>
-      
+
       <h2 className="text-lg font-semibold mb-3">選擇性揭露欄位</h2>
       <p className="text-sm text-gray-500 mb-4">
         勾選要對驗證方揭露的欄位，點擊欄位可查看更多技術細節
       </p>
-      
+
       <Card className="mb-6">
         <CardContent className="pt-4">
           {disclosures.length > 0 ? (
             <div className="space-y-2">
               {disclosures.map((field, index) => {
                 const isExpanded = expandedFields.includes(field.key);
-                
+
                 return (
                   <div key={index} className="border rounded-md">
                     <div className="flex items-start p-3">
                       {/* 選擇框 */}
-                      <Checkbox 
+                      <Checkbox
                         id={`field-${index}`}
                         checked={selectedDisclosures.includes(field.key)}
                         onCheckedChange={() => toggleField(field.key)}
                         className="mt-1 mr-2"
                       />
-                      
+
                       {/* 欄位資訊 */}
                       <div className="flex-1">
-                        <div 
+                        <div
                           className="flex justify-between items-center cursor-pointer"
                           onClick={() => toggleExpand(field.key)}
                         >
@@ -180,16 +184,16 @@ export const CredentialDetailPage = () => {
                             {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                           </Button>
                         </div>
-                        
+
                         <div className="text-gray-600 text-sm mt-1">
                           <span className="font-medium">value: </span>
                           <span className="break-all">
-                            {typeof field.value === 'object' 
-                              ? JSON.stringify(field.value) 
+                            {typeof field.value === 'object'
+                              ? JSON.stringify(field.value)
                               : String(field.value)}
                           </span>
                         </div>
-                        
+
                         {/* 展開的技術詳情 */}
                         {isExpanded && (
                           <div className="mt-2 p-2 bg-gray-50 rounded text-xs space-y-2">
@@ -212,22 +216,22 @@ export const CredentialDetailPage = () => {
           )}
         </CardContent>
       </Card>
-      
+
       <div className="flex space-x-2 justify-between">
-        <Button 
-          variant="destructive" 
+        <Button
+          variant="destructive"
           onClick={() => setShowDeleteDialog(true)}
           className="flex items-center gap-1"
         >
           <Trash2 className="h-4 w-4" />
           <span>刪除憑證</span>
         </Button>
-        
+
         <div className="flex space-x-2">
           <Dialog>
             <DialogTrigger asChild>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="flex items-center gap-1"
               >
                 <Share2 className="h-4 w-4" />
@@ -241,7 +245,7 @@ export const CredentialDetailPage = () => {
                   將會將選定欄位提供給驗證方
                 </DialogDescription>
               </DialogHeader>
-              
+
               <div className="py-4">
                 <h3 className="text-sm font-medium mb-2">以下欄位將被揭露</h3>
                 <div className="border rounded p-3 space-y-2 max-h-[200px] overflow-y-auto">
@@ -254,8 +258,8 @@ export const CredentialDetailPage = () => {
                           {field && (
                             <div className="text-gray-600 text-xs mt-1">
                               <span>
-                                {typeof field.value === 'object' 
-                                  ? JSON.stringify(field.value) 
+                                {typeof field.value === 'object'
+                                  ? JSON.stringify(field.value)
                                   : String(field.value)}
                               </span>
                             </div>
@@ -270,14 +274,14 @@ export const CredentialDetailPage = () => {
                   )}
                 </div>
               </div>
-              
+
               <DialogFooter>
                 <Button
-                  onClick={() => navigate('/present', { 
-                    state: { 
+                  onClick={() => navigate('/present', {
+                    state: {
                       jwt: credential.rawCredential,
-                      selectedDisclosures 
-                    } 
+                      selectedDisclosures
+                    }
                   })}
                   disabled={selectedDisclosures.length === 0}
                 >
@@ -289,7 +293,7 @@ export const CredentialDetailPage = () => {
           </Dialog>
         </div>
       </div>
-      
+
       {/* 刪除確認對話框 */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>

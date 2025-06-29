@@ -10,23 +10,28 @@ export const CredentialViewer = () => {
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    const decodeCredentials = () => {
+    const decodeCredentials = async () => {
       try {
-        // 解碼每個憑證
-        const decoded = credentials
-          .map((cred: string) => decodeSDJWT(cred))
-          .filter(Boolean) as DecodedCredential[];
+        const decoded = await Promise.all(
+          credentials.map(async (cred: string) => {
+            const result = await decodeSDJWT(cred);
+            if (!result) {
+              console.warn('無法解析憑證:', cred.substring(0, 50));
+            }
+            return result;
+          })
+        );
         
-        setDecodedCredentials(decoded);
+        setDecodedCredentials(decoded.filter(Boolean) as DecodedCredential[]);
       } catch (e) {
-        //console.error('載入憑證失敗:', e);
+        console.error('載入憑證失敗:', e);
       } finally {
         setLoading(false);
       }
     };
     
     decodeCredentials();
-  }, [credentials]); // 僅在 credentials 變更時重新解碼
+  }, [credentials]);
   
   if (loading) {
     return <div className="flex justify-center p-6">載入中...</div>;
@@ -39,7 +44,6 @@ export const CredentialViewer = () => {
   return (
     <div className="grid gap-4 md:grid-cols-2">
       {decodedCredentials.map((credential, index) => {
-        // 獲取憑證欄位數量
         const credentialFields = parseDisclosures(credential.rawCredential);
         
         return (

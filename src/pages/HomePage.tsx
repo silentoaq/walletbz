@@ -11,27 +11,39 @@ import {
 import { decodeSDJWT } from '@/utils/sd-jwt';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import { Badge } from '@/components/ui/badge';
+import { useState, useEffect } from 'react';
 
 export const HomePage = () => {
   const { wallet } = usePhantomWallet();
   const [credentials] = useLocalStorage<string[]>('walletCredentials', []);
   const credentialCount = credentials.length;
+  const [latestCredential, setLatestCredential] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   
-  // 從 localStorage 中獲取最近的憑證
-  const getLatestCredential = () => {
-    try {
-      const storedCredentials = JSON.parse(localStorage.getItem('walletCredentials') || '[]');
-      if (storedCredentials.length === 0) return null;
-      
-      const latestCredential = storedCredentials[storedCredentials.length - 1];
-      return decodeSDJWT(latestCredential);
-    } catch (e) {
-      console.error('載入最近憑證失敗:', e);
-      return null;
-    }
-  };
-  
-  const latestCredential = getLatestCredential();
+  // 異步獲取最近的憑證
+  useEffect(() => {
+    const getLatestCredential = async () => {
+      try {
+        setLoading(true);
+        const storedCredentials = JSON.parse(localStorage.getItem('walletCredentials') || '[]');
+        if (storedCredentials.length === 0) {
+          setLatestCredential(null);
+          return;
+        }
+        
+        const latestCredentialRaw = storedCredentials[storedCredentials.length - 1];
+        const decoded = await decodeSDJWT(latestCredentialRaw);
+        setLatestCredential(decoded);
+      } catch (e) {
+        console.error('載入最近憑證失敗:', e);
+        setLatestCredential(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    getLatestCredential();
+  }, [credentials]);
   
   return (
     <div className="space-y-6">
@@ -71,7 +83,7 @@ export const HomePage = () => {
       </section>
       
       {/* 最近的憑證 */}
-      {latestCredential && (
+      {!loading && latestCredential && (
         <section>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-lg font-medium">最近領取的憑證</h2>
@@ -88,8 +100,8 @@ export const HomePage = () => {
                   </h3>
                   <div className="flex flex-wrap gap-1 my-1">
                     {latestCredential.types
-                      .filter(type => type !== 'VerifiableCredential')
-                      .map((type, i) => (
+                      .filter((type: string) => type !== 'VerifiableCredential')
+                      .map((type: string, i: number) => (
                         <Badge key={i} variant="secondary" className="text-xs">
                           {type.replace(/Credential$/, '')}
                         </Badge>
@@ -98,25 +110,6 @@ export const HomePage = () => {
                   <p className="text-xs text-gray-500 mb-2">
                     發行者: {latestCredential.issuer}
                   </p>
-                  {/* 
-                  {Object.keys(latestCredential.disclosedClaims).length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      <p className="text-xs font-medium">已揭露欄位:</p>
-                      <div className="text-xs text-gray-600 space-y-1">
-                        {Object.entries(latestCredential.disclosedClaims)
-                          .slice(0, 2)
-                          .map(([key, value]) => (
-                            <div key={key}>
-                              {key}: <span className="text-gray-900">{String(value)}</span>
-                            </div>
-                          ))}
-                        {Object.keys(latestCredential.disclosedClaims).length > 2 && (
-                          <p className="text-xs">+ 更多欄位</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  */}
                 </div>
                 
                 <Link 
@@ -127,6 +120,24 @@ export const HomePage = () => {
                     <ChevronRight className="h-5 w-5" />
                   </Button>
                 </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
+      
+      {/* 載入中 */}
+      {loading && credentialCount > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-medium">最近領取的憑證</h2>
+          </div>
+          <Card>
+            <CardContent className="p-4">
+              <div className="animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-2/3"></div>
               </div>
             </CardContent>
           </Card>
