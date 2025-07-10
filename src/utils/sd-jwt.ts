@@ -2,6 +2,7 @@ export interface DecodedCredential {
   id: string;
   issuer: string;
   issuanceDate: string;
+  expirationDate?: string;
   subjectId: string;
   types: string[];
   disclosedClaims: Record<string, any>;
@@ -130,6 +131,7 @@ export const decodeSDJWT = async (sdJwt: string): Promise<DecodedCredential | nu
       id: vc.id || '未指定ID',
       issuer: vc.issuer || '未知發行者',
       issuanceDate: vc.issuanceDate || new Date().toISOString(),
+      expirationDate: payload.exp ? new Date(payload.exp * 1000).toISOString() : undefined,
       subjectId: credentialSubject.id || '未知持有者',
       types: vc.type || ['VerifiableCredential'],
       disclosedClaims,

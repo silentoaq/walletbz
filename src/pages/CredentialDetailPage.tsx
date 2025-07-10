@@ -138,6 +138,14 @@ export const CredentialDetailPage = () => {
                 {new Date(credential.issuanceDate).toLocaleDateString('zh-TW')}
               </span>
             </div>
+            {credential.expirationDate && (
+              <div className="text-sm">
+                <span className="font-medium">過期日期: </span>
+                <span className="text-gray-600">
+                  {new Date(credential.expirationDate).toLocaleDateString('zh-TW')}
+                </span>
+              </div>
+            )}
             <div className="text-sm">
               <span className="font-medium">持有者: </span>
               <span className="text-gray-600 truncate w-full block overflow-hidden text-ellipsis whitespace-nowrap">
